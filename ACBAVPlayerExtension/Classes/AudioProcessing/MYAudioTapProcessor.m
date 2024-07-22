@@ -422,8 +422,8 @@ static void tap_ProcessCallback(MTAudioProcessingTapRef tap, CMItemCount numberF
 		return;
 	}
 	
-	MYAudioTapProcessor *self = ((__bridge MYAudioTapProcessor *)context->self);
-    
+    __unsafe_unretained MYAudioTapProcessor *self = ((__bridge MYAudioTapProcessor *)context->self);
+
     if (!self) {
         NSLog(@"AudioTapProcessor - processCallback CANCELLED (self is nil)");
         return;
