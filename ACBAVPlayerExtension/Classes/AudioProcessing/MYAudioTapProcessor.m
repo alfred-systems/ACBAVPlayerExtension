@@ -421,104 +421,108 @@ static void tap_ProcessCallback(MTAudioProcessingTapRef tap, CMItemCount numberF
 		NSLog(@"Unsupported tap processing format.");
 		return;
 	}
-	
-    __unsafe_unretained MYAudioTapProcessor *self = ((__bridge MYAudioTapProcessor *)context->self);
 
-    if (!self) {
-        NSLog(@"AudioTapProcessor - processCallback CANCELLED (self is nil)");
-        return;
-    }
+    @try {
+        __unsafe_unretained MYAudioTapProcessor *self = ((__bridge MYAudioTapProcessor *)context->self);
 
-	if (self.isBandpassFilterEnabled)
-	{
-		// Apply bandpass filter Audio Unit.
-		AudioUnit audioUnit = context->audioUnit;
-		if (audioUnit)
-		{
-			AudioTimeStamp audioTimeStamp;
-			audioTimeStamp.mSampleTime = context->sampleCount;
-			audioTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
-			
-			status = AudioUnitRender(audioUnit, 0, &audioTimeStamp, 0, (UInt32)numberFrames, bufferListInOut);
-			if (noErr != status)
-			{
-				NSLog(@"AudioUnitRender(): %d", (int)status);
-				return;
-			}
-			
-			// Increment sample count for audio unit.
-			context->sampleCount += numberFrames;
-			
-			// Set number of frames out.
-			*numberFramesOut = numberFrames;
-		}
-	}
-	else
-	{
-		// Get actual audio buffers from MTAudioProcessingTap (AudioUnitRender() will fill bufferListInOut otherwise).
-		status = MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, NULL, numberFramesOut);
-		if (noErr != status)
-		{
-			NSLog(@"MTAudioProcessingTapGetSourceAudio: %d", (int)status);
-			return;
-		}
-	}
-	
-    UInt32 aCount = bufferListInOut->mNumberBuffers;
-    
-    context->numberOfChannels = (float)aCount;
-    
-    if (aCount > 0) {
-        if (context->channelVolumeList) {
-            free(context->channelVolumeList);
-            context->channelVolumeList = NULL;
+        if (!self) {
+            NSLog(@"AudioTapProcessor - processCallback CANCELLED (self is nil)");
+            return;
         }
-        context->channelVolumeList = malloc(aCount * sizeof(float));
-        
-        if (context->channelVolumeList == 0) {
-            NSLog(@"Error! could not initialize channel volume list");
+
+        if (self.isBandpassFilterEnabled)
+        {
+            // Apply bandpass filter Audio Unit.
+            AudioUnit audioUnit = context->audioUnit;
+            if (audioUnit)
+            {
+                AudioTimeStamp audioTimeStamp;
+                audioTimeStamp.mSampleTime = context->sampleCount;
+                audioTimeStamp.mFlags = kAudioTimeStampSampleTimeValid;
+
+                status = AudioUnitRender(audioUnit, 0, &audioTimeStamp, 0, (UInt32)numberFrames, bufferListInOut);
+                if (noErr != status)
+                {
+                    NSLog(@"AudioUnitRender(): %d", (int)status);
+                    return;
+                }
+
+                // Increment sample count for audio unit.
+                context->sampleCount += numberFrames;
+
+                // Set number of frames out.
+                *numberFramesOut = numberFrames;
+            }
         }
+        else
+        {
+            // Get actual audio buffers from MTAudioProcessingTap (AudioUnitRender() will fill bufferListInOut otherwise).
+            status = MTAudioProcessingTapGetSourceAudio(tap, numberFrames, bufferListInOut, flagsOut, NULL, numberFramesOut);
+            if (noErr != status)
+            {
+                NSLog(@"MTAudioProcessingTapGetSourceAudio: %d", (int)status);
+                return;
+            }
+        }
+
+        UInt32 aCount = bufferListInOut->mNumberBuffers;
+
+        context->numberOfChannels = (float)aCount;
+
+        if (aCount > 0) {
+            if (context->channelVolumeList) {
+                free(context->channelVolumeList);
+                context->channelVolumeList = NULL;
+            }
+            context->channelVolumeList = malloc(aCount * sizeof(float));
+
+            if (context->channelVolumeList == 0) {
+                NSLog(@"Error! could not initialize channel volume list");
+            }
+        }
+
+        context->bufferList = bufferListInOut;
+        context->numberOfFrames = (AVAudioFrameCount)numberFrames;
+
+        NSValue *audioBufferList = [NSValue valueWithBytes:&bufferListInOut objCType:@encode(AudioBufferList *)];
+
+        // Calculate root mean square (RMS) for left and right audio channel.
+        for (UInt32 i = 0; i < bufferListInOut->mNumberBuffers; i++)
+        {
+            AudioBuffer *pBuffer = &bufferListInOut->mBuffers[i];
+            UInt32 cSamples = (UInt32) (numberFrames * (context->isNonInterleaved ? 1 : pBuffer->mNumberChannels));
+
+            float *pData = (float *)pBuffer->mData;
+
+            float rms = 0.0f;
+            for (UInt32 j = 0; j < cSamples; j++)
+            {
+                rms += pData[j] * pData[j];
+            }
+            if (cSamples > 0)
+            {
+                rms = sqrtf(rms / cSamples);
+            }
+
+            if (0 == i)
+            {
+                context->leftChannelVolume = rms;
+            }
+            if (1 == i || (0 == i && 1 == bufferListInOut->mNumberBuffers))
+            {
+                context->rightChannelVolume = rms;
+            }
+
+            context->channelVolumeList[i] = rms;
+        }
+
+        // Pass calculated left and right channel volume to VU meters.
+        [self updateLeftChannelVolume:context->leftChannelVolume rightChannelVolume:context->rightChannelVolume];
+        [self updateChannelVolumeList:context->channelVolumeList withChannelVolumeListCount:aCount];
+        [self updateWithAudioBuffer:audioBufferList capacity:(AVAudioFrameCount)numberFrames];
+    } @catch (NSException *exception) {
+
     }
-    
-    context->bufferList = bufferListInOut;
-    context->numberOfFrames = (AVAudioFrameCount)numberFrames;
-    
-    NSValue *audioBufferList = [NSValue valueWithBytes:&bufferListInOut objCType:@encode(AudioBufferList *)];
-    
-	// Calculate root mean square (RMS) for left and right audio channel.
-	for (UInt32 i = 0; i < bufferListInOut->mNumberBuffers; i++)
-	{
-		AudioBuffer *pBuffer = &bufferListInOut->mBuffers[i];
-		UInt32 cSamples = (UInt32) (numberFrames * (context->isNonInterleaved ? 1 : pBuffer->mNumberChannels));
-		
-		float *pData = (float *)pBuffer->mData;
-		
-		float rms = 0.0f;
-		for (UInt32 j = 0; j < cSamples; j++)
-		{
-			rms += pData[j] * pData[j];
-		}
-		if (cSamples > 0)
-		{
-			rms = sqrtf(rms / cSamples);
-		}
-		
-		if (0 == i)
-		{
-			context->leftChannelVolume = rms;
-		}
-		if (1 == i || (0 == i && 1 == bufferListInOut->mNumberBuffers))
-		{
-			context->rightChannelVolume = rms;
-		}
-        
-        context->channelVolumeList[i] = rms;
-	}
-	
-	// Pass calculated left and right channel volume to VU meters.
-	[self updateLeftChannelVolume:context->leftChannelVolume rightChannelVolume:context->rightChannelVolume];
-    [self updateChannelVolumeList:context->channelVolumeList withChannelVolumeListCount:aCount];
-    [self updateWithAudioBuffer:audioBufferList capacity:(AVAudioFrameCount)numberFrames];
 }
 
 #pragma mark - Audio Unit Callbacks
