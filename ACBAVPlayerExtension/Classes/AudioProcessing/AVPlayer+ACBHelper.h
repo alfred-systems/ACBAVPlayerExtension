@@ -36,12 +36,15 @@ typedef void (^ACBAVPlayerBufferFetchedBlock) (AVAudioPCMBuffer *audioPCMBuffer,
 - (float)averagePowerInLinearFormForChannel:(NSUInteger)channelNumber; //returns in average power in linear form. Value is in between 0 to 1.
 
 //fetch average power list in linear form(values in between 0 and 1)
-- (void)averagePowerListInLinearFormWithCallbackBlock:(ACBAVPlayerMeteringBlock)iMeteringCallbackBlock;
+- (void)averagePowerListInLinear;
 
 //fetch AVAudioPCMBuffer. it has useful methods to manipuate buffers or to display a visualizer
 - (void)audioPCMBufferFetchedWithCallbackBlock:(ACBAVPlayerBufferFetchedBlock)iAudioBufferFetchedBlock;
 
 //use this instead of "replaceCurrentItemWithPlayerItem" for metering to work.
 - (void)replaceCurrentItemAndUpdateMeteringForPlayerItem:(nullable AVPlayerItem *)item;
+
+@property (nonatomic, copy, nullable) ACBAVPlayerMeteringBlock meteringBlock;
+
 
 @end
