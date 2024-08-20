@@ -44,7 +44,6 @@ typedef void (^ACBAVPlayerBufferFetchedBlock) (AVAudioPCMBuffer *audioPCMBuffer,
 //use this instead of "replaceCurrentItemWithPlayerItem" for metering to work.
 - (void)replaceCurrentItemAndUpdateMeteringForPlayerItem:(nullable AVPlayerItem *)item;
 
-@property (nonatomic, copy, nullable) ACBAVPlayerMeteringBlock meteringBlock;
-
+- (void)setAveragePowerListMeteringBlock:(ACBAVPlayerMeteringBlock _Nonnull )block;
 
 @end

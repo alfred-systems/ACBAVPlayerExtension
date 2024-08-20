@@ -12,10 +12,12 @@
 
 
 NSString const *ACBAVPlayerAudioProcessHelperkey = @"ACBAVPlayerAudioProcessHelperkey";
+NSString const *ACBAVPlayerMeteringBlockKey = @"ACBAVPlayerMeteringBlockKey";
 
 @interface AVPlayer (ACBHelper_Private)
 
 @property (nonatomic, strong) ACBAudioProcessHelper *audioProcessHelper;
+@property (nonatomic, copy) ACBAVPlayerMeteringBlock meteringBlock;
 
 @end
 
@@ -31,11 +33,22 @@ NSString const *ACBAVPlayerAudioProcessHelperkey = @"ACBAVPlayerAudioProcessHelp
     return objc_getAssociatedObject(self, &ACBAVPlayerAudioProcessHelperkey);
 }
 
+- (void)setMeteringBlock:(ACBAVPlayerMeteringBlock)meteringBlock {
+    objc_setAssociatedObject(self, &ACBAVPlayerMeteringBlockKey, meteringBlock, OBJC_ASSOCIATION_COPY_NONATOMIC);
+}
+
+- (ACBAVPlayerMeteringBlock)meteringBlock {
+    return objc_getAssociatedObject(self, &ACBAVPlayerMeteringBlockKey);
+}
+
 @end
 
 
 @implementation AVPlayer(ACBHelper)
 
+- (void)setAveragePowerListMeteringBlock:(ACBAVPlayerMeteringBlock _Nonnull )block {
+    self.meteringBlock = block;
+}
 
 - (void)stop {
     [self seekToTime:kCMTimeZero];
