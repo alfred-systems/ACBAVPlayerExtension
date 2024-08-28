@@ -131,15 +131,15 @@ NSString const *ACBAVPlayerMeteringBlockKey = @"ACBAVPlayerMeteringBlockKey";
 }
 
 
-- (void)averagePowerListInLinearWithCallbackBlock:(ACBAVPlayerMeteringBlock)block {
-    self.meteringBlock = block;
+- (void)averagePowerListInLinear {
+    
     if (!self.audioProcessHelper) {
         NSLog(@"Enable Metering before calling this method");
         if (self.meteringBlock) {
             self.meteringBlock(nil, false);
         }
     }
-
+    
     __weak __typeof(self) weakSelf = self;
     [self.audioProcessHelper averagePowerListInLinearFormWithCallbackBlock:^(NSArray *iAvgPowerList, BOOL iSuccess) {
         if (weakSelf.meteringBlock) {
@@ -147,6 +147,7 @@ NSString const *ACBAVPlayerMeteringBlockKey = @"ACBAVPlayerMeteringBlockKey";
         }
     }];
 }
+
 
 - (void)audioPCMBufferFetchedWithCallbackBlock:(ACBAVPlayerBufferFetchedBlock)iAudioBufferFetchedBlock {
     
